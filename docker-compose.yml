@@ -1,0 +1,97 @@
+# =============================================================================
+# Ludo Multiplayer — Full Stack Docker Compose
+# For LOCAL development only.
+#
+# Production stack:
+#   Backend  → Koyeb   (https://www.koyeb.com)   — free Docker hosting
+#   Database → Neon    (https://neon.tech)        — free serverless PostgreSQL
+#   Cache    → Upstash (https://upstash.com)      — free Redis 10k req/day
+#   Frontend → Vercel  (https://vercel.com)       — free React/Vite hosting
+# =============================================================================
+
+version: '3.9'
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: ludo-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ludo_db
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Jatin@999}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ludo_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ludo-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Spring Boot Backend ─────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./ludo-backend
+      dockerfile: Dockerfile
+    container_name: ludo-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ludo_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-Jatin@999}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-local-dev-secret-key-change-in-production-must-be-at-least-256-bits}
+      CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:80,http://frontend
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # ── React + Nginx Frontend ──────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./ludo-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ""          # Empty = use Nginx proxy (recommended for Docker)
+        VITE_WS_BASE_URL: ""           # Empty = uses window.location.host logic
+    container_name: ludo-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: ludo-network

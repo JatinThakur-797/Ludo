@@ -1,0 +1,66 @@
+name: CI — Build & Test
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Backend Tests ─────────────────────────────────────────────────────────
+  backend-test:
+    name: Backend (Java 17 / Maven)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: maven
+
+      - name: Run backend tests
+        working-directory: ./ludo-backend
+        run: mvn test -Dspring.profiles.active=test -B
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: ludo-backend/target/surefire-reports/
+
+  # ── Frontend Build + Tests ────────────────────────────────────────────────
+  frontend-test:
+    name: Frontend (Node 20 / Vite)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ludo-frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./ludo-frontend
+        run: npm ci
+
+      - name: Run frontend tests
+        working-directory: ./ludo-frontend
+        run: npm run test
+
+      - name: Build (verify it compiles)
+        working-directory: ./ludo-frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: "https://placeholder.railway.app/api/v1"
+          VITE_WS_BASE_URL: "wss://placeholder.railway.app"

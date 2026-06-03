@@ -1,0 +1,17 @@
+spring:
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+  datasource:
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+logging:
+  level:
+    org.hibernate.SQL: WARN
+    org.flywaydb: INFO
+    com.ludo.game: INFO
+    root: WARN

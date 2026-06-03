@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: ludo-backend
+
+  datasource:
+    # Neon (prod): jdbc:postgresql://<host>/<db>?sslmode=require
+    # Local:       jdbc:postgresql://localhost:5432/ludo_db
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ludo_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:Jatin@999}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:20}
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
+
+  data:
+    redis:
+      # Upstash uses rediss:// (TLS). Spring Boot auto-detects the scheme.
+      # Local: redis://localhost:6379
+      url: ${REDIS_URL:redis://localhost:6379}
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: true
+
+# JWT secret — MUST be overridden via JWT_SECRET env var in production
+jwt:
+  secret: ${JWT_SECRET:local-dev-secret-key-change-in-production-must-be-at-least-256-bits}
+  access-token-expiry: ${JWT_ACCESS_EXPIRY:900000}
+  refresh-token-expiry: ${JWT_REFRESH_EXPIRY:604800000}
+
+# CORS — comma-separated list of allowed origins
+# Set CORS_ALLOWED_ORIGINS=https://your-app.vercel.app on Koyeb
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+
+server:
+  port: ${PORT:8080}
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.flywaydb: INFO
+    com.ludo.game: DEBUG

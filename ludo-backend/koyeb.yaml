@@ -1,0 +1,43 @@
+# Koyeb service configuration for the Spring Boot backend
+# https://www.koyeb.com/docs/reference/koyeb-app-config
+
+name: ludo-backend
+
+services:
+  - name: ludo-backend
+    type: web
+    git:
+      repository: github.com/YOUR_USERNAME/YOUR_REPO_NAME
+      branch: main
+      build_command: ""
+      run_command: ""
+    docker:
+      dockerfile: Dockerfile
+      target: ""
+    instance_types:
+      - eco      # Free tier instance (512 MB RAM, 0.1 vCPU)
+    regions:
+      - was      # Washington DC (closest for most users; options: was, par, sin, fra, syd, tyo)
+    ports:
+      - port: 8080
+        protocol: http
+    health_checks:
+      - grace_period: 60
+        interval: 30
+        restart_limit: 3
+        path: /api/v1/auth/health
+        port: 8080
+        protocol: http
+        timeout: 5
+    env:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: SERVER_PORT
+        value: "8080"
+      # The following secrets must be set in the Koyeb dashboard:
+      # SPRING_DATASOURCE_URL    — from Neon console (jdbc:postgresql://... format)
+      # SPRING_DATASOURCE_USERNAME — from Neon console
+      # SPRING_DATASOURCE_PASSWORD — from Neon console
+      # REDIS_URL                — from Upstash console
+      # JWT_SECRET               — generate: openssl rand -base64 64
+      # CORS_ALLOWED_ORIGINS     — your Vercel frontend URL

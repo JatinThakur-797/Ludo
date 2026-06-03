@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ludo-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ludo_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Jatin@999
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ludo-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
