@@ -1,4 +1,4 @@
-name: CD — Deploy to Koyeb + Vercel
+name: CD — Deploy to Northflank + Vercel
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}   # Auto-provided by GitHub, no setup needed
+          password: ${{ secrets.GITHUB_TOKEN }}   # Auto-provided by GitHub
 
       - name: Extract Docker metadata
         id: meta
@@ -47,22 +47,32 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── Deploy Backend on Koyeb ───────────────────────────────────────────────
+  # ── Deploy Backend on Northflank ─────────────────────────────────────────
   deploy-backend:
-    name: Deploy Backend → Koyeb
+    name: Deploy Backend → Northflank
     runs-on: ubuntu-latest
     needs: build-and-push
     environment: production
 
-    steps:
-      - name: Install Koyeb CLI
-        run: curl -fsSL https://raw.githubusercontent.com/koyeb/koyeb-cli/master/install.sh | bash
+    env:
+      # Set NORTHFLANK_PROJECT_ID and NORTHFLANK_SERVICE_ID in:
+      # GitHub → Settings → Secrets and variables → Actions → Variables (not secrets)
+      PROJECT_ID: ${{ vars.NORTHFLANK_PROJECT_ID }}
+      SERVICE_ID: ${{ vars.NORTHFLANK_SERVICE_ID }}
+      # NORTHFLANK_CREDENTIALS_ID is the registry credential ID created in Northflank
+      # for pulling from GHCR. See setup guide below.
+      CREDENTIALS_ID: ${{ vars.NORTHFLANK_CREDENTIALS_ID }}
 
-      - name: Redeploy Koyeb service
-        env:
-          KOYEB_TOKEN: ${{ secrets.KOYEB_TOKEN }}
-        run: |
-          koyeb service redeploy ludo-backend/ludo-backend
+    steps:
+      - name: Deploy image to Northflank
+        uses: northflank/deploy-to-northflank@v1
+        with:
+          northflank-api-key: ${{ secrets.NORTHFLANK_API_KEY }}
+          project-id: ${{ env.PROJECT_ID }}
+          service-id: ${{ env.SERVICE_ID }}
+          # Pass the full sha-tagged image so Northflank pulls the exact build
+          image-path: ghcr.io/${{ github.repository_owner }}/ludo-backend:sha-${{ github.sha }}
+          credentials-id: ${{ env.CREDENTIALS_ID }}
 
   # ── Deploy Frontend to Vercel ─────────────────────────────────────────────
   deploy-frontend:
