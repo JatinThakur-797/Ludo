@@ -20,18 +20,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # ✅ FIX 1: Set up Docker Buildx with docker-container driver
+      # Required for GHA cache (type=gha) to work correctly
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}   # Auto-provided by GitHub
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ✅ FIX 2: GHCR image paths MUST be all lowercase
+      # github.repository_owner can have uppercase letters (e.g. JatinThakur-797)
+      # This step converts it to lowercase (e.g. jatinthakur-797)
+      - name: Convert owner to lowercase
+        id: lower
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/ludo-backend
+          images: ghcr.io/${{ steps.lower.outputs.owner }}/ludo-backend
           tags: |
             type=sha,prefix=sha-
             type=raw,value=latest
@@ -54,25 +66,21 @@ jobs:
     needs: build-and-push
     environment: production
 
-    env:
-      # Set NORTHFLANK_PROJECT_ID and NORTHFLANK_SERVICE_ID in:
-      # GitHub → Settings → Secrets and variables → Actions → Variables (not secrets)
-      PROJECT_ID: ${{ vars.NORTHFLANK_PROJECT_ID }}
-      SERVICE_ID: ${{ vars.NORTHFLANK_SERVICE_ID }}
-      # NORTHFLANK_CREDENTIALS_ID is the registry credential ID created in Northflank
-      # for pulling from GHCR. See setup guide below.
-      CREDENTIALS_ID: ${{ vars.NORTHFLANK_CREDENTIALS_ID }}
-
     steps:
+      # Need lowercase owner here too for the image-path
+      - name: Convert owner to lowercase
+        id: lower
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - name: Deploy image to Northflank
         uses: northflank/deploy-to-northflank@v1
         with:
           northflank-api-key: ${{ secrets.NORTHFLANK_API_KEY }}
-          project-id: ${{ env.PROJECT_ID }}
-          service-id: ${{ env.SERVICE_ID }}
-          # Pass the full sha-tagged image so Northflank pulls the exact build
-          image-path: ghcr.io/${{ github.repository_owner }}/ludo-backend:sha-${{ github.sha }}
-          credentials-id: ${{ env.CREDENTIALS_ID }}
+          project-id: ${{ vars.NORTHFLANK_PROJECT_ID }}
+          service-id: ${{ vars.NORTHFLANK_SERVICE_ID }}
+          # Uses lowercase owner — fixes "Please check your credentials" error
+          image-path: ghcr.io/${{ steps.lower.outputs.owner }}/ludo-backend:sha-${{ github.sha }}
+          credentials-id: ${{ vars.NORTHFLANK_CREDENTIALS_ID }}
 
   # ── Deploy Frontend to Vercel ─────────────────────────────────────────────
   deploy-frontend:

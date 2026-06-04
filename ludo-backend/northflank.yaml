@@ -14,7 +14,7 @@ service:
   # GHCR, then calls the Northflank API to update the deployment image tag.
   image:
     registry: ghcr.io
-    repository: YOUR_GITHUB_USERNAME/ludo-backend   # e.g. jatinthakur797/ludo-backend
+    repository: jatinthakur-797/ludo-backend   # ⚠️ MUST be all lowercase — GHCR requirement
     tag: latest                                      # overridden per-deploy by SHA tag
 
   # ── Resources (Developer Sandbox — free tier) ────────────────────────────
