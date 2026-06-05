@@ -27,6 +27,7 @@ yarn-error.log*
 # ── IDE ───────────────────────────────────────────────────────────────────────
 .idea/
 *.iml
+.vscode
 .vscode/settings.json
 *.suo
 *.user

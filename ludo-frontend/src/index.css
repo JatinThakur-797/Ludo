@@ -601,7 +601,7 @@ body {
    ──────────────────────────────────────────────── */
 .game-layout {
   position: relative;
-  top: 161px;
+  top: 127px;
   display: flex;
   flex-direction: row;
   justify-content: center;

@@ -4,7 +4,7 @@
 
 ### A real-time, full-stack multiplayer Ludo game built with React + Spring Boot
 
-[![CI](https://github.com/YOUR_USERNAME/ludo-game/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/ludo-game/actions/workflows/ci.yml)
+[![CI](https://github.com/JatinThakur-797/Ludo/actions/workflows/ci.yml/badge.svg)](https://github.com/JatinThakur-797/Ludo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-17-orange?logo=openjdk)](https://openjdk.org/projects/jdk/17/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4-brightgreen?logo=spring)](https://spring.io/projects/spring-boot)

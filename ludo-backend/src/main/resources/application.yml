@@ -20,7 +20,7 @@ spring:
     redis:
       # Upstash uses rediss:// (TLS). Spring Boot auto-detects the scheme.
       # Local: redis://localhost:6379
-      url: ${REDIS_URL:redis://localhost:6379}
+      url: ${REDIS_URL:rediss://default:gQAAAAAAAbd3AAIgcDIwMTgzNWJhODY4NzY0OWU0OGVjYmI3NWU0ZDgwNmNlYw@intimate-sole-112503.upstash.io:6379}
 
   flyway:
     enabled: true

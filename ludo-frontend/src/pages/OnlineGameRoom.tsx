@@ -183,8 +183,10 @@ export const OnlineGameRoom: React.FC = () => {
           setLogs(p => [...p, `🎲 ${activeName} rolled a ${gs.lastRoll}!`]);
         else if (gs.turnPhase === 'WAITING_FOR_ROLL')
           setLogs(p => [...p, `⏩ ${activeName}'s turn.`]);
-        if (gs.winnerColor)
-          setLogs(p => [...p, `🏆 ${gs.players[gs.winnerColor]?.displayName} wins!`]);
+        if (gs.winnerColor) {
+          const winnerName = gs.players[gs.winnerColor]?.displayName || '';
+          setLogs(p => [...p, `🏆 ${winnerName} wins!`]);
+        }
       } else if (eventType === 'CHAT_MESSAGE') {
         const cd = data as { sender?: string; content?: string };
         setChatMessages(p => [...p, { sender: cd.sender || 'Anonymous', content: cd.content || '' }]);
