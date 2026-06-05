@@ -14,6 +14,17 @@ const getWSUrl = (token: string | null) => {
     return `${import.meta.env.VITE_WS_BASE_URL}/ws${tokenParam}`;
   }
 
+  // Automatically derive from VITE_API_BASE_URL if it is available
+  if (import.meta.env.VITE_API_BASE_URL) {
+    try {
+      const url = new URL(import.meta.env.VITE_API_BASE_URL);
+      const protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${protocol}//${url.host}/ws${tokenParam}`;
+    } catch (e) {
+      console.error('Failed to parse VITE_API_BASE_URL for WebSocket', e);
+    }
+  }
+
   // Docker Compose / same-origin: derive from page URL so Nginx can proxy
   const isSecure = window.location.protocol === 'https:';
   const protocol = isSecure ? 'wss:' : 'ws:';

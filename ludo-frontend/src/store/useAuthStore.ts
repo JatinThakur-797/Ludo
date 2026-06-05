@@ -49,7 +49,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   login: async (email, password) => {
     set({ isLoading: true });
     try {
-      const response = await api.post('/auth/login', { email, password });
+      const response = await api.post('/v1/auth/login', { email, password });
       const { accessToken, user } = response.data;
       set({
         user,
@@ -66,7 +66,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   signup: async (email, password, displayName) => {
     set({ isLoading: true });
     try {
-      const response = await api.post('/auth/signup', { email, password, displayName });
+      const response = await api.post('/v1/auth/signup', { email, password, displayName });
       const { accessToken, user } = response.data;
       set({
         user,
@@ -83,7 +83,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: async () => {
     set({ isLoading: true });
     try {
-      await api.post('/auth/logout');
+      await api.post('/v1/auth/logout');
     } catch (error) {
       console.error('Logout error', error);
     } finally {
@@ -99,7 +99,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   checkAuth: async () => {
     set({ isLoading: true });
     try {
-      const response = await api.post('/auth/refresh');
+      const response = await api.post('/v1/auth/refresh');
       const { accessToken, user } = response.data;
       set({
         user,

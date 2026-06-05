@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { api } from '../services/api';
 
 interface UserStats {
   ratingMmr: number;
@@ -85,32 +86,27 @@ export const Dashboard: React.FC = () => {
   const fetchStats = async () => {
     setLoadingStats(true);
     try {
-      const token = useAuthStore.getState().accessToken;
-      const r = await fetch('/api/users/me/stats', { headers: { 'Authorization': `Bearer ${token}` } });
-      if (r.ok) setStats(await r.json());
+      const r = await api.get('/users/me/stats');
+      setStats(r.data);
     } catch { /* silent */ } finally { setLoadingStats(false); }
   };
 
   const fetchMatches = async () => {
     setLoadingMatches(true);
     try {
-      const token = useAuthStore.getState().accessToken;
-      const r = await fetch('/api/users/me/matches', { headers: { 'Authorization': `Bearer ${token}` } });
-      if (r.ok) setMatches(await r.json());
+      const r = await api.get('/users/me/matches');
+      setMatches(r.data);
     } catch { /* silent */ } finally { setLoadingMatches(false); }
   };
 
   const fetchLeaderboard = async (page: number) => {
     setLoadingLeaderboard(true);
     try {
-      const token = useAuthStore.getState().accessToken;
-      const r = await fetch(`/api/leaderboard?page=${page}&size=10`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (r.ok) {
-        const d: PaginatedLeaderboard = await r.json();
-        setLeaderboard(d.content);
-        setLeaderboardTotalPages(d.totalPages);
-        setLeaderboardPage(d.number);
-      }
+      const r = await api.get(`/leaderboard?page=${page}&size=10`);
+      const d: PaginatedLeaderboard = r.data;
+      setLeaderboard(d.content);
+      setLeaderboardTotalPages(d.totalPages);
+      setLeaderboardPage(d.number);
     } catch { /* silent */ } finally { setLoadingLeaderboard(false); }
   };
 
@@ -125,27 +121,28 @@ export const Dashboard: React.FC = () => {
   const handleCreateRoom = async () => {
     setCreatingRoom(true); setJoinError('');
     try {
-      const token = useAuthStore.getState().accessToken;
-      const r = await fetch('/api/rooms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ maxPlayers: settingsMaxPlayers, turnTimerSeconds: 15, killRequiredToEnterHome: true }),
+      const r = await api.post('/rooms', {
+        maxPlayers: settingsMaxPlayers,
+        turnTimerSeconds: 15,
+        killRequiredToEnterHome: true,
       });
-      if (r.ok) { const room = await r.json(); navigate(`/game/online/${room.roomCode}`); }
-      else setJoinError('Failed to create room.');
-    } catch { setJoinError('Network error.'); } finally { setCreatingRoom(false); }
+      navigate(`/game/online/${r.data.roomCode}`);
+    } catch { setJoinError('Failed to create room.'); } finally { setCreatingRoom(false); }
   };
 
   const handleJoinRoom = async () => {
     if (joinCode.length !== 6) { setJoinError('Code must be exactly 6 characters.'); return; }
     setJoinError('');
     try {
-      const token = useAuthStore.getState().accessToken;
-      const r = await fetch(`/api/rooms/${joinCode.toUpperCase()}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (r.ok) navigate(`/game/online/${joinCode.toUpperCase()}`);
-      else if (r.status === 404) setJoinError('Room not found. Check your code.');
-      else setJoinError('Failed to join room.');
-    } catch { setJoinError('Network error.'); }
+      await api.get(`/rooms/${joinCode.toUpperCase()}`);
+      navigate(`/game/online/${joinCode.toUpperCase()}`);
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        setJoinError('Room not found. Check your code.');
+      } else {
+        setJoinError('Failed to join room.');
+      }
+    }
   };
 
   const mmr = stats?.ratingMmr ?? user?.ratingMmr ?? 1200;

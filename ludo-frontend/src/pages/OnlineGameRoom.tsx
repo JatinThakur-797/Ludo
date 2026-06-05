@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { api } from '../services/api';
 import { Board } from '../components/game/Board';
 import { Dice } from '../components/game/Dice';
 import { gameAudio } from '../utils/audio';
@@ -131,20 +132,20 @@ export const OnlineGameRoom: React.FC = () => {
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
   useEffect(() => { connect(); }, [connect]);
 
-  /* Fetch room on load */
   useEffect(() => {
     const fetchRoom = async () => {
       try {
-        const token = useAuthStore.getState().accessToken;
-        const r = await fetch(`/api/rooms/${code}`, { headers: { 'Authorization': `Bearer ${token}` } });
-        if (r.ok) {
-          setRoom(await r.json() as LudoRoom);
-          setLogs(p => [...p, `Lobby loaded — Code: ${code}`]);
-        } else {
+        const response = await api.get(`/rooms/${code}`);
+        setRoom(response.data as LudoRoom);
+        setLogs(p => [...p, `Lobby loaded — Code: ${code}`]);
+      } catch (error: any) {
+        if (error.response?.status === 404) {
           setLogs(p => [...p, 'Room not found. Returning...']);
-          setTimeout(() => navigate('/'), 2000);
+        } else {
+          setLogs(p => [...p, 'Failed to connect.']);
         }
-      } catch { setLogs(p => [...p, 'Failed to connect.']); }
+        setTimeout(() => navigate('/'), 2000);
+      }
     };
     if (code) fetchRoom();
   }, [code, navigate]);

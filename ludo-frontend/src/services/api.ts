@@ -5,13 +5,22 @@ import { useAuthStore } from '../store/useAuthStore';
 // In Docker Compose, this is empty so Nginx proxies /api → backend container.
 // In local dev without Docker, falls back to localhost:8080.
 const getBaseURL = (): string => {
+  let url = '';
   if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL as string;
+    url = import.meta.env.VITE_API_BASE_URL as string;
+  } else if (import.meta.env.DEV) {
+    url = 'http://localhost:8080/api';
+  } else {
+    url = '/api'; // Nginx proxy in Docker
   }
-  if (import.meta.env.DEV) {
-    return 'http://localhost:8080/api/v1';
+
+  // Normalize: if the url ends in /v1 or /v1/, strip it so it ends with /api
+  if (url.endsWith('/v1')) {
+    url = url.substring(0, url.length - 3);
+  } else if (url.endsWith('/v1/')) {
+    url = url.substring(0, url.length - 4);
   }
-  return '/api/v1'; // Nginx proxy in Docker / Vercel rewrite
+  return url;
 };
 
 export const api = axios.create({
@@ -60,9 +69,9 @@ api.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      originalRequest.url !== '/auth/refresh' &&
-      originalRequest.url !== '/auth/login' &&
-      originalRequest.url !== '/auth/signup'
+      originalRequest.url !== '/v1/auth/refresh' &&
+      originalRequest.url !== '/v1/auth/login' &&
+      originalRequest.url !== '/v1/auth/signup'
     ) {
       if (isRefreshing) {
         return new Promise<string | null>((resolve, reject) => {
@@ -81,7 +90,7 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const response = await api.post('/auth/refresh');
+        const response = await api.post('/v1/auth/refresh');
         const { accessToken, user } = response.data;
         
         useAuthStore.getState().setAuth(user, accessToken);
