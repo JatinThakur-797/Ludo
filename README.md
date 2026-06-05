@@ -11,7 +11,7 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://www.typescriptlang.org/)
 
-**[Live Demo →](https://ludo-game-xxxx.vercel.app)** &nbsp;|&nbsp; **[API Docs →](#api-reference)**
+**[Live Demo →](https://ludo-three-sandy.vercel.app/)** &nbsp;|&nbsp; **[API Docs →](#api-reference)**
 
 </div>
 
