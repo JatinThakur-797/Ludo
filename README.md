@@ -364,10 +364,12 @@ Go to **Settings → Secrets and variables → Actions** and add:
 
 | Secret | Where to get it |
 |--------|----------------|
-| `KOYEB_TOKEN` | Koyeb → Account → API → Create Token |
+| `NORTHFLANK_API_KEY` | Northflank → Account Settings → API Keys |
 | `VERCEL_TOKEN` | Vercel → Account Settings → Tokens |
 
 > `GITHUB_TOKEN` is auto-provided by GitHub Actions — no setup needed.
+> 
+> Legacy fallback: if you already have `NORTHFLANK_TOKEN` configured, the deploy workflow will use it when `NORTHFLANK_API_KEY` is not set.
 
 ### Full step-by-step deployment guide → [`walkthrough.md`](walkthrough.md)
 
