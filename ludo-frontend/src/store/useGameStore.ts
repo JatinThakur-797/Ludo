@@ -5,6 +5,14 @@ import { createInitialGameState, rollDice, moveToken } from '../engine/ludoEngin
 import { gameAudio } from '../utils/audio';
 import { selectBestMove } from '../engine/aiHeuristics';
 
+/**
+ * Module-level flag that prevents multiple overlapping AI turn triggers.
+ * When AI roll → move happens in ~800ms, both actions fire setTimeout(triggerAiTurn).
+ * Without this guard the second setTimeout queues a second AI turn that runs
+ * after the first, causing double-roll or skip-turn bugs.
+ */
+let aiTurnPending = false;
+
 interface GameStoreActions {
   startNewLocalGame: (
     playerConfigs: Array<{ userId: string | null; displayName: string; color: PlayerColor; isAi: boolean }>
@@ -81,8 +89,10 @@ export const useGameStore = create<GameStore>()(
           // Handle AI Turn Auto-Trigger (if the next player is AI)
           if (nextState.status === 'ACTIVE' && nextState.activeColor) {
             const nextPlayer = nextState.players[nextState.activeColor];
-            if (nextPlayer && nextPlayer.isAi) {
+            if (nextPlayer && nextPlayer.isAi && !aiTurnPending) {
+              aiTurnPending = true;
               setTimeout(() => {
+                aiTurnPending = false;
                 get().triggerAiTurn();
               }, 800);
             }
@@ -106,8 +116,10 @@ export const useGameStore = create<GameStore>()(
           // Handle AI Turn Auto-Trigger (if the next player is AI)
           if (nextState.status === 'ACTIVE' && nextState.activeColor) {
             const nextPlayer = nextState.players[nextState.activeColor];
-            if (nextPlayer && nextPlayer.isAi) {
+            if (nextPlayer && nextPlayer.isAi && !aiTurnPending) {
+              aiTurnPending = true;
               setTimeout(() => {
+                aiTurnPending = false;
                 get().triggerAiTurn();
               }, 800);
             }
@@ -141,6 +153,7 @@ export const useGameStore = create<GameStore>()(
       },
 
       resetGameAction: () => {
+        aiTurnPending = false; // Clear any pending AI trigger on reset
         set({ ...defaultState });
       }
     }),

@@ -119,17 +119,37 @@ export const OnlineGameRoom: React.FC = () => {
   const [chatInput, setChatInput]   = useState('');
   const [logs, setLogs]             = useState<string[]>(['Connecting to room...']);
   const [turnTime, setTurnTime]     = useState(15);
-  const [isRolling, setIsRolling]   = useState(false);
+  /**
+   * rollId — incremented each time the server signals a dice roll via the
+   * PLAY_SOUND_ROLL effect. Using a counter (not a boolean) ensures:
+   *  - Animations start for every distinct roll event, even same-face repeats.
+   *  - No 600ms setTimeout race: the Dice component itself enforces MIN duration.
+   *  - No stale closure issues: only the increment matters, not the value.
+   */
+  const [rollId, setRollId]         = useState(0);
   const [copied, setCopied]         = useState(false);
   const [activePanel, setActivePanel] = useState<'log' | 'chat'>('log');
   const hasConfetti                 = useRef(false);
 
-  const logEndRef  = useRef<HTMLDivElement>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  /* Scoped scroll refs — these point to the CONTAINER divs, not sentinel
+     elements. We scroll via scrollTop to avoid scrollIntoView climbing the
+     DOM and jumping the page viewport on mobile. */
+  const logContainerRef  = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const lastSeqRef = useRef<number>(-1);
 
-  useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [logs]);
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
+  /* Scroll log/chat containers — scoped to their inner div, never touches
+     the page window. This eliminates the #1 cause of mobile viewport jumps. */
+  useEffect(() => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [logs]);
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
   useEffect(() => { connect(); }, [connect]);
 
   useEffect(() => {
@@ -172,7 +192,13 @@ export const OnlineGameRoom: React.FC = () => {
         setRoom(prev => prev ? { ...prev, status: gs.status, gameState: gs } : prev);
 
         (su.effects || []).forEach(eff => {
-          if (eff.type === 'PLAY_SOUND_ROLL')    { setIsRolling(true); setTimeout(() => setIsRolling(false), 600); gameAudio.playRoll(); }
+          if (eff.type === 'PLAY_SOUND_ROLL') {
+            /* Increment rollId to start a new dice animation.
+               The Dice component enforces the minimum 1500ms duration
+               internally, so we no longer need the 600ms setTimeout hack. */
+            setRollId(id => id + 1);
+            gameAudio.playRoll();
+          }
           else if (eff.type === 'PLAY_SOUND_MOVE')    gameAudio.playMove();
           else if (eff.type === 'PLAY_SOUND_CAPTURE') gameAudio.playCapture();
           else if (eff.type === 'PLAY_SOUND_GOAL')    gameAudio.playGoal();
@@ -203,20 +229,36 @@ export const OnlineGameRoom: React.FC = () => {
     return () => { roomSub?.unsubscribe(); errSub?.unsubscribe(); };
   }, [isConnected, code, subscribe, sendMessage]);
 
-  /* Timer */
+  /* Timer
+   * FIX: Two-effect pattern replaced with one combined effect.
+   * Sequence reset + interval creation happen together so there is exactly
+   * one interval running at any point in time.                              */
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
-    if (!room?.gameState) return;
+    // Always clear the previous interval first (prevents stacking)
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    if (room?.status !== 'ACTIVE' || !room?.gameState) return;
+
     const seq = room.gameState.sequenceNumber;
+    // Reset timer display when sequence changes
     if (seq !== lastSeqRef.current) {
       lastSeqRef.current = seq;
       setTurnTime(room.settings?.turnTimerSeconds ?? 15);
     }
-  }, [room?.gameState]);
 
-  useEffect(() => {
-    if (room?.status !== 'ACTIVE' || !room?.gameState) return;
-    const t = setInterval(() => setTurnTime(p => (p <= 1 ? 0 : p - 1)), 1000);
-    return () => clearInterval(t);
+    timerIntervalRef.current = setInterval(
+      () => setTurnTime(p => (p <= 1 ? 0 : p - 1)),
+      1000
+    );
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    };
   }, [room?.status, room?.gameState?.sequenceNumber]);
 
   /* Confetti on win */
@@ -454,7 +496,7 @@ export const OnlineGameRoom: React.FC = () => {
             {/* Lobby Chat */}
             <div className="glass-card" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', height: 500 }}>
               <div className="section-label">Lobby Chat</div>
-              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+              <div ref={chatContainerRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
                 {chatMessages.length === 0 && (
                   <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, marginTop: 50, fontStyle: 'italic' }}>
                     Say hello to your opponents! 👋
@@ -473,7 +515,6 @@ export const OnlineGameRoom: React.FC = () => {
                     </div>
                   );
                 })}
-                <div ref={chatEndRef} />
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input
@@ -585,7 +626,7 @@ export const OnlineGameRoom: React.FC = () => {
                   value={room.gameState.lastRoll}
                   activeColor={room.gameState.activeColor}
                   isRollable={isMyTurn && room.gameState.turnPhase === 'WAITING_FOR_ROLL'}
-                  isRolling={isRolling}
+                  rollId={rollId}
                   onRoll={handleDiceRoll}
                 />
                 {room.gameState.lastRoll !== null && (
@@ -660,21 +701,20 @@ export const OnlineGameRoom: React.FC = () => {
 
                 {/* Log panel */}
                 {activePanel === 'log' && (
-                  <div style={{ flex: 1, overflowY: 'auto', fontFamily: 'monospace', fontSize: 11 }}>
+                  <div ref={logContainerRef} style={{ flex: 1, overflowY: 'auto', fontFamily: 'monospace', fontSize: 11 }}>
                     {logs.map((log, i) => (
                       <div key={i} style={{ display: 'flex', gap: 8, paddingBottom: 4, paddingTop: 3, borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                         <span style={{ opacity: 0.3, flexShrink: 0, fontSize: 10 }}>[{i + 1}]</span>
                         <span style={{ color: log.startsWith('🏆') ? '#facc15' : log.startsWith('🎲') ? '#a78bfa' : 'var(--text-muted)' }}>{log}</span>
                       </div>
                     ))}
-                    <div ref={logEndRef} />
                   </div>
                 )}
 
                 {/* Chat panel */}
                 {activePanel === 'chat' && (
                   <>
-                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                    <div ref={chatContainerRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
                       {chatMessages.length === 0 && (
                         <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 11, marginTop: 30, fontStyle: 'italic' }}>
                           No messages yet
@@ -691,7 +731,6 @@ export const OnlineGameRoom: React.FC = () => {
                           </div>
                         );
                       })}
-                      <div ref={chatEndRef} />
                     </div>
                     <div style={{ display: 'flex', gap: 7, flexShrink: 0 }}>
                       <input

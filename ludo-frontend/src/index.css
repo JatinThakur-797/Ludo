@@ -67,7 +67,9 @@
 html {
   min-height: 100%;
   background: var(--bg-base);
-  scroll-behavior: smooth;
+  /* REMOVED scroll-behavior:smooth — it causes the whole page to animate
+     whenever scrollIntoView or scrollTop is set programmatically, amplifying
+     every layout shift into a visible page-level scroll jump. */
 }
 
 body {
@@ -80,6 +82,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  /* Prevent mobile rubber-band / overscroll that causes viewport to jump */
+  overscroll-behavior: none;
 }
 
 #root {
@@ -219,26 +223,27 @@ body {
   }
 }
 
+/* ── Realistic 3D dice tumble animation ──
+   Uses rotateX + rotateY with a staggered easing so the die appears to
+   tumble naturally rather than spin uniformly. Duration set in component
+   via animation-duration CSS variable (default 1.75s). */
 @keyframes diceSpin3d {
-  0% {
-    transform: rotateX(0deg) rotateY(0deg) scale(1.05);
-  }
+  0%   { transform: rotateX(0deg)   rotateY(0deg)   scale(1.0);  }
+  10%  { transform: rotateX(72deg)  rotateY(30deg)  scale(1.08); }
+  25%  { transform: rotateX(144deg) rotateY(80deg)  scale(1.05); }
+  40%  { transform: rotateX(200deg) rotateY(140deg) scale(1.10); }
+  55%  { transform: rotateX(260deg) rotateY(190deg) scale(1.06); }
+  70%  { transform: rotateX(310deg) rotateY(240deg) scale(1.09); }
+  85%  { transform: rotateX(345deg) rotateY(280deg) scale(1.04); }
+  100% { transform: rotateX(360deg) rotateY(360deg) scale(1.0);  }
+}
 
-  25% {
-    transform: rotateX(90deg) rotateY(45deg) scale(1.08);
-  }
-
-  50% {
-    transform: rotateX(180deg) rotateY(90deg) scale(1.05);
-  }
-
-  75% {
-    transform: rotateX(270deg) rotateY(135deg) scale(1.08);
-  }
-
-  100% {
-    transform: rotateX(360deg) rotateY(180deg) scale(1.05);
-  }
+/* Landing snap — brief scale-down to signal the dice has landed */
+@keyframes diceLand {
+  0%   { transform: scale(1.08); }
+  50%  { transform: scale(0.93); }
+  75%  { transform: scale(1.04); }
+  100% { transform: scale(1.0);  }
 }
 
 @keyframes ping {
@@ -600,15 +605,15 @@ body {
    17. Game layout
    ──────────────────────────────────────────────── */
 .game-layout {
-  position: relative;
-  top: 127px;
+  /* REMOVED: position:relative; top:127px  — this 127px magic offset pushed the
+     entire game view down, making the page taller than the viewport on mobile
+     and enabling accidental scroll. The sticky header handles its own space. */
   display: flex;
   flex-direction: row;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   gap: 20px;
   padding: 16px 20px 24px;
-  min-height: calc(100vh - 60px);
   box-sizing: border-box;
 }
 
@@ -620,6 +625,8 @@ body {
   min-width: 300px;
   max-width: 700px;
   align-self: flex-start;
+  /* Prevent accidental horizontal swipe / pinch-zoom on the board on mobile */
+  touch-action: pan-y;
 }
 
 /* HUD column */
@@ -644,7 +651,8 @@ body {
     align-items: center;
     padding: 12px 12px 24px;
     gap: 16px;
-    min-height: unset;
+    /* Do NOT set min-height here — it allows the page to grow and enables
+       unwanted scroll. Let content determine height naturally. */
   }
 
   .game-board-col {
@@ -652,11 +660,16 @@ body {
     width: 100%;
     max-width: 540px;
     min-width: unset;
+    /* Lock board to viewport-relative size on mobile so it never
+       overflows and forces the page to scroll */
+    width: min(100vw - 24px, 540px);
   }
 
   .game-hud-col {
     width: 100%;
     max-width: 540px;
+    /* On mobile the HUD is below the board; allow it to scroll internally
+       via the container's overflowY, not the page itself */
     max-height: unset;
     overflow: visible;
   }

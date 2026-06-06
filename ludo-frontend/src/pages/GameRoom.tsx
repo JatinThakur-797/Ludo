@@ -144,7 +144,6 @@ function spawnConfetti() {
 /* ─── Main component ─── */
 export const GameRoom: React.FC = () => {
   const store = useGameStore();
-  const logEndRef = useRef<HTMLDivElement>(null);
   const hasSpawnedConfetti = useRef(false);
 
   /* Lobby state */
@@ -158,12 +157,21 @@ export const GameRoom: React.FC = () => {
 
   /* Game state */
   const [logs, setLogs]               = useState<string[]>(['Select players and launch the match!']);
-  const [isRolling, setIsRolling]     = useState(false);
+  /**
+   * rollId — increments each time a new dice roll is triggered.
+   * Passed to the Dice component so it knows exactly when to start a new
+   * animation, regardless of the face value (fixes same-value-twice bug).
+   */
+  const [rollId, setRollId]           = useState(0);
   const lastSeq = useRef(-1);
+  /* Ref to the log list container element for scoped scrolling (not page scroll) */
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
-  /* Scroll log */
+  /* Scroll log container — scoped to the inner div, never touches window */
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
   }, [logs]);
 
   /* Watch for store updates → generate logs */
@@ -176,7 +184,6 @@ export const GameRoom: React.FC = () => {
     const entries: string[] = [];
 
     if (store.turnPhase === 'WAITING_FOR_MOVE' && store.lastRoll !== null) {
-      setIsRolling(false);
       entries.push(`🎲 ${name} rolled a ${store.lastRoll}!${store.lastRoll === 6 ? ' 🎉 Bonus roll!' : ''}`);
     } else if (store.turnPhase === 'WAITING_FOR_ROLL') {
       entries.push(`⏩ ${name}'s turn — roll the dice!`);
@@ -196,17 +203,31 @@ export const GameRoom: React.FC = () => {
     if (store.status !== 'COMPLETED') hasSpawnedConfetti.current = false;
   }, [store.status]);
 
-  /* Turn timer */
+  /* Turn timer
+   * FIX: One single interval at a time. We clear the previous one at the TOP
+   * of the effect (before creating a new one) so rapid sequenceNumber changes
+   * from AI turns never stack up multiple simultaneous intervals.             */
   const [turnTimer, setTurnTimer] = useState(15);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
+    // Always clear any previously running interval first
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     if (store.status !== 'ACTIVE') return;
+
     setTurnTimer(15);
-    if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       setTurnTimer(p => (p <= 1 ? 0 : p - 1));
     }, 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    // Cleanup when the effect re-fires or the component unmounts
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [store.sequenceNumber, store.status]);
 
   /* Active colors for selected player count */
@@ -229,7 +250,11 @@ export const GameRoom: React.FC = () => {
 
   const handleDiceRoll = useCallback(() => {
     if (store.turnPhase !== 'WAITING_FOR_ROLL') return;
-    setIsRolling(true);
+    /* Increment rollId — the Dice component's useEffect on rollId will start
+       the animation. Doing this BEFORE store.rollDiceAction() guarantees the
+       animation begins even if the store updates synchronously (which it does
+       in the local game engine). */
+    setRollId(id => id + 1);
     store.rollDiceAction();
   }, [store]);
 
@@ -250,6 +275,7 @@ export const GameRoom: React.FC = () => {
 
   const handleReset = () => {
     store.resetGameAction();
+    setRollId(0);
     setLogs(['Select players and launch the match!']);
   };
 
@@ -581,7 +607,7 @@ export const GameRoom: React.FC = () => {
                   value={store.lastRoll}
                   activeColor={store.activeColor}
                   isRollable={isHumanTurn}
-                  isRolling={isRolling}
+                  rollId={rollId}
                   onRoll={handleDiceRoll}
                 />
 
@@ -635,11 +661,10 @@ export const GameRoom: React.FC = () => {
                 maxHeight: 210,
               }}>
                 <div className="section-label" style={{ flexShrink: 0 }}>Match Log</div>
-                <div style={{ overflowY: 'auto', flex: 1 }}>
+                <div ref={logContainerRef} style={{ overflowY: 'auto', flex: 1 }}>
                   {logs.map((log, i) => (
                     <LogEntry key={i} text={log} index={i} />
                   ))}
-                  <div ref={logEndRef} />
                 </div>
               </div>
 
