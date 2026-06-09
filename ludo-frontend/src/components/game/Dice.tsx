@@ -20,10 +20,10 @@ const DOTS: Record<number, [number, number][]> = {
 };
 
 const COLOR_THEME: Record<PlayerColor, { face: string; darkFace: string; ring: string; dot: string; shadow: string }> = {
-  RED:    { face: '#d32f2f', darkFace: '#9b2c2c', ring: '#ff8a80', dot: '#ffffff', shadow: 'rgba(211,47,47,0.5)' },
-  GREEN:  { face: '#2e7d32', darkFace: '#1b5e20', ring: '#a5d6a7', dot: '#ffffff', shadow: 'rgba(46,125,50,0.5)' },
+  RED: { face: '#d32f2f', darkFace: '#9b2c2c', ring: '#ff8a80', dot: '#ffffff', shadow: 'rgba(211,47,47,0.5)' },
+  GREEN: { face: '#2e7d32', darkFace: '#1b5e20', ring: '#a5d6a7', dot: '#ffffff', shadow: 'rgba(46,125,50,0.5)' },
   YELLOW: { face: '#f57f17', darkFace: '#e65100', ring: '#fff59d', dot: '#ffffff', shadow: 'rgba(245,127,23,0.5)' },
-  BLUE:   { face: '#1565c0', darkFace: '#0d47a1', ring: '#90caf9', dot: '#ffffff', shadow: 'rgba(21,101,192,0.5)' },
+  BLUE: { face: '#1565c0', darkFace: '#0d47a1', ring: '#90caf9', dot: '#ffffff', shadow: 'rgba(21,101,192,0.5)' },
 };
 
 const DEFAULT_THEME = { face: '#3b4270', darkFace: '#1f243e', ring: '#8892b0', dot: '#ffffff', shadow: 'rgba(59,66,112,0.4)' };
@@ -284,10 +284,10 @@ export const Dice: React.FC<DiceProps> = ({
         {isAnimating
           ? '🎲 Rolling...'
           : isRollable
-          ? '🎲 Roll'
-          : value !== null
-          ? `Rolled ${value}`
-          : '— Waiting —'}
+            ? '🎲 Roll'
+            : value !== null
+              ? `Rolled ${value}`
+              : '— Waiting —'}
       </div>
     </div>
   );

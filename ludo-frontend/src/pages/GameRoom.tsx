@@ -227,6 +227,35 @@ export const GameRoom: React.FC = () => {
     if (store.status !== 'COMPLETED') hasSpawnedConfetti.current = false;
   }, [store.status]);
 
+  /* Auto-move token if only one token is movable */
+  useEffect(() => {
+    if (store.status !== 'ACTIVE') return;
+
+    const activeColor = store.activeColor;
+    if (!activeColor) return;
+
+    const activePlayer = store.players[activeColor];
+    const isHuman = activePlayer && !activePlayer.isAi;
+
+    if (isHuman && store.turnPhase === 'WAITING_FOR_MOVE' && store.availableMoves.length === 1) {
+      const tokenIndex = store.availableMoves[0].tokenIndex;
+      const timer = setTimeout(() => {
+        // Fetch current store state to verify no changes occurred during wait
+        const checkState = useGameStore.getState();
+        if (
+          checkState.status === 'ACTIVE' &&
+          checkState.activeColor === activeColor &&
+          checkState.turnPhase === 'WAITING_FOR_MOVE' &&
+          checkState.availableMoves.length === 1 &&
+          checkState.availableMoves[0].tokenIndex === tokenIndex
+        ) {
+          handleTokenClick(tokenIndex);
+        }
+      }, 1600); // Wait 1.6s for dice animation to complete
+      return () => clearTimeout(timer);
+    }
+  }, [store.sequenceNumber, store.status, store.turnPhase, store.activeColor, store.availableMoves]);
+
   /* Active colors for selected player count */
   const activeColors: PlayerColor[] =
     playerCount === 2 ? ['RED', 'YELLOW'] :
@@ -496,6 +525,7 @@ export const GameRoom: React.FC = () => {
                 availableMoves={store.availableMoves}
                 turnPhase={store.turnPhase}
                 onTokenClick={handleTokenClick}
+                status={store.status}
               />
             </div>
 

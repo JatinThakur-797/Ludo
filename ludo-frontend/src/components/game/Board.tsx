@@ -1,5 +1,5 @@
 import React from 'react';
-import type { PlayerColor, PlayerState, ValidMove, TurnPhase } from '../../engine/types';
+import type { PlayerColor, PlayerState, ValidMove, TurnPhase, GameStatus } from '../../engine/types';
 import { GLOBAL_TRACK_CELLS_GRID, HOME_PATH_CELLS_GRID } from '../../utils/coordinates';
 import { Token } from './Token';
 
@@ -10,6 +10,7 @@ interface BoardProps {
   availableMoves: ValidMove[];
   turnPhase: TurnPhase;
   onTokenClick: (tokenIndex: number) => void;
+  status: GameStatus;
 }
 
 /* ─── Constants ─── */
@@ -103,7 +104,7 @@ const YardLabel: React.FC<{
 
 /* ─── Board Base Component ─── */
 const BoardComponent: React.FC<BoardProps> = ({
-  players, activeColor, availableMoves, turnPhase, onTokenClick,
+  players, activeColor, availableMoves, turnPhase, onTokenClick, status,
 }) => {
   /* Home yard definitions */
   const yards: Array<{
@@ -351,6 +352,7 @@ const BoardComponent: React.FC<BoardProps> = ({
                 position={token.position}
                 isMovable={canMove}
                 onClick={() => onTokenClick(token.index)}
+                gameStatus={status}
               />
             );
           })
@@ -362,6 +364,7 @@ const BoardComponent: React.FC<BoardProps> = ({
 
 // Strict props-comparison for optimized rendering
 const arePropsEqual = (prevProps: BoardProps, nextProps: BoardProps) => {
+  if (prevProps.status !== nextProps.status) return false;
   if (prevProps.activeColor !== nextProps.activeColor) return false;
   if (prevProps.turnPhase !== nextProps.turnPhase) return false;
 

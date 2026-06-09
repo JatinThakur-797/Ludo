@@ -131,6 +131,11 @@ export const OnlineGameRoom: React.FC = () => {
   const [activePanel, setActivePanel] = useState<'log' | 'chat'>('log');
   const hasConfetti                 = useRef(false);
 
+  const mySlot   = room?.slots?.find(s => s.userId === user?.id);
+  const myColor  = mySlot?.color;
+  const isHost   = room?.hostId === user?.id;
+  const isMyTurn = room?.gameState?.activeColor === myColor;
+
   /* Scoped scroll refs — these point to the CONTAINER divs. Scroll via
      scrollTop to avoid viewport jumps. */
   const logContainerRef  = useRef<HTMLDivElement>(null);
@@ -241,10 +246,32 @@ export const OnlineGameRoom: React.FC = () => {
     }
   }, [room?.status]);
 
-  const mySlot   = room?.slots?.find(s => s.userId === user?.id);
-  const myColor  = mySlot?.color;
-  const isHost   = room?.hostId === user?.id;
-  const isMyTurn = room?.gameState?.activeColor === myColor;
+  /* Auto-move token if only one token is movable in online game */
+  useEffect(() => {
+    if (room?.status !== 'ACTIVE' || !room?.gameState) return;
+    const gs = room.gameState;
+
+    // Check if it is the local player's turn to move
+    const isMyActiveTurn = gs.activeColor === myColor;
+    if (isMyActiveTurn && gs.turnPhase === 'WAITING_FOR_MOVE' && gs.availableMoves?.length === 1) {
+      const tokenIndex = gs.availableMoves[0].tokenIndex;
+      const timer = setTimeout(() => {
+        // Fetch current room state to verify validity
+        if (
+          room.status === 'ACTIVE' &&
+          room.gameState?.activeColor === myColor &&
+          room.gameState?.turnPhase === 'WAITING_FOR_MOVE' &&
+          room.gameState?.availableMoves?.length === 1 &&
+          room.gameState?.availableMoves[0].tokenIndex === tokenIndex
+        ) {
+          sendMessage(`/app/game/${code}/move`, { tokenIndex });
+        }
+      }, 1600); // Wait 1.6s for dice animation to complete
+      return () => clearTimeout(timer);
+    }
+  }, [room?.gameState?.sequenceNumber, room?.status, myColor, code, sendMessage]);
+
+
 
   const handleToggleReady = useCallback(() => {
     if (!mySlot) return;
@@ -483,6 +510,7 @@ export const OnlineGameRoom: React.FC = () => {
                 availableMoves={room.gameState.availableMoves || []}
                 turnPhase={room.gameState.turnPhase}
                 onTokenClick={handleTokenClick}
+                status={room.status}
               />
             </div>
 
