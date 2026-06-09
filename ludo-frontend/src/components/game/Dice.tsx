@@ -68,7 +68,7 @@ export const Dice: React.FC<DiceProps> = ({
     if (animationLockRef.current) return;
     animationLockRef.current = true;
     minDurationElapsedRef.current = false;
-    pendingFinalFaceRef.current = null;
+    pendingFinalFaceRef.current = value;
     animStartTimeRef.current = Date.now();
 
     setIsAnimating(true);
@@ -81,7 +81,7 @@ export const Dice: React.FC<DiceProps> = ({
         commitStop(pendingFinalFaceRef.current);
       }
     }, 1500);
-  }, [commitStop]);
+  }, [commitStop, value]);
 
   /* ── Effect: rollId triggers animation start ── */
   useEffect(() => {
