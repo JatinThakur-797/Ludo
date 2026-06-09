@@ -5,25 +5,17 @@ import { createInitialGameState, rollDice, moveToken } from '../engine/ludoEngin
 import { gameAudio } from '../utils/audio';
 import { selectBestMove } from '../engine/aiHeuristics';
 
-/**
- * Module-level flag that prevents multiple overlapping AI turn triggers.
- * When AI roll → move happens in ~800ms, both actions fire setTimeout(triggerAiTurn).
- * Without this guard the second setTimeout queues a second AI turn that runs
- * after the first, causing double-roll or skip-turn bugs.
- */
-let aiTurnPending = false;
-
 interface GameStoreActions {
   startNewLocalGame: (
     playerConfigs: Array<{ userId: string | null; displayName: string; color: PlayerColor; isAi: boolean }>
   ) => void;
   rollDiceAction: (diceOverride?: number) => void;
   moveTokenAction: (tokenIndex: number) => void;
-  triggerAiTurn: () => void;
+  triggerAiTurn: () => void | Promise<void>;
   resetGameAction: () => void;
 }
 
-export type GameStore = GameState & GameStoreActions;
+export type GameStore = GameState & GameStoreActions & { isAiThinking: boolean };
 
 const defaultState: GameState = {
   gameId: '',
@@ -68,11 +60,12 @@ export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => ({
       ...defaultState,
+      isAiThinking: false,
 
       startNewLocalGame: (playerConfigs) => {
         const gameId = Math.random().toString(36).substring(2, 9);
         const initialState = createInitialGameState(gameId, playerConfigs);
-        set({ ...initialState });
+        set({ ...initialState, isAiThinking: false });
       },
 
       rollDiceAction: (diceOverride) => {
@@ -89,10 +82,8 @@ export const useGameStore = create<GameStore>()(
           // Handle AI Turn Auto-Trigger (if the next player is AI)
           if (nextState.status === 'ACTIVE' && nextState.activeColor) {
             const nextPlayer = nextState.players[nextState.activeColor];
-            if (nextPlayer && nextPlayer.isAi && !aiTurnPending) {
-              aiTurnPending = true;
+            if (nextPlayer && nextPlayer.isAi && !get().isAiThinking) {
               setTimeout(() => {
-                aiTurnPending = false;
                 get().triggerAiTurn();
               }, 800);
             }
@@ -116,10 +107,8 @@ export const useGameStore = create<GameStore>()(
           // Handle AI Turn Auto-Trigger (if the next player is AI)
           if (nextState.status === 'ACTIVE' && nextState.activeColor) {
             const nextPlayer = nextState.players[nextState.activeColor];
-            if (nextPlayer && nextPlayer.isAi && !aiTurnPending) {
-              aiTurnPending = true;
+            if (nextPlayer && nextPlayer.isAi && !get().isAiThinking) {
               setTimeout(() => {
-                aiTurnPending = false;
                 get().triggerAiTurn();
               }, 800);
             }
@@ -129,38 +118,65 @@ export const useGameStore = create<GameStore>()(
         }
       },
 
-      // Evaluates and triggers AI rolls and moves
-      triggerAiTurn: () => {
+      // Evaluates and triggers AI rolls and moves sequentially
+      triggerAiTurn: async () => {
         const state = get();
         if (state.status !== 'ACTIVE' || !state.activeColor) return;
 
         const activePlayer = state.players[state.activeColor];
         if (!activePlayer || !activePlayer.isAi) return;
 
-        if (state.turnPhase === 'WAITING_FOR_ROLL') {
-          // AI Rolls
-          get().rollDiceAction();
-        } else if (state.turnPhase === 'WAITING_FOR_MOVE') {
-          // AI Moves using isolated Heuristic selection
-          const bestMove = selectBestMove(state as GameState, state.availableMoves, state.activeColor);
-          if (bestMove) {
-            // Simulate slight delay before AI move for natural feel
-            setTimeout(() => {
-              get().moveTokenAction(bestMove.tokenIndex);
-            }, 600);
+        if (get().isAiThinking) return;
+        set({ isAiThinking: true });
+
+        try {
+          while (true) {
+            const curState = get();
+            if (curState.status !== 'ACTIVE' || !curState.activeColor) break;
+            const p = curState.players[curState.activeColor];
+            if (!p || !p.isAi) break;
+
+            if (curState.turnPhase === 'WAITING_FOR_ROLL') {
+              get().rollDiceAction();
+              // Wait for rolling animation (1650ms to allow 1500ms anim + transition buffer)
+              await new Promise((resolve) => setTimeout(resolve, 1650));
+            } else if (curState.turnPhase === 'WAITING_FOR_MOVE') {
+              const bestMove = selectBestMove(curState as GameState, curState.availableMoves, curState.activeColor);
+              if (bestMove) {
+                get().moveTokenAction(bestMove.tokenIndex);
+                // Wait for moving animation (850ms)
+                await new Promise((resolve) => setTimeout(resolve, 850));
+              } else {
+                break;
+              }
+            } else {
+              break;
+            }
+          }
+        } finally {
+          set({ isAiThinking: false });
+
+          // After AI finished its loop, check if the next player is AI and trigger
+          const nextState = get();
+          if (nextState.status === 'ACTIVE' && nextState.activeColor) {
+            const nextPlayer = nextState.players[nextState.activeColor];
+            if (nextPlayer && nextPlayer.isAi) {
+              setTimeout(() => {
+                get().triggerAiTurn();
+              }, 800);
+            }
           }
         }
       },
 
       resetGameAction: () => {
-        aiTurnPending = false; // Clear any pending AI trigger on reset
-        set({ ...defaultState });
+        set({ ...defaultState, isAiThinking: false });
       }
     }),
     {
       name: 'ludo-local-match',
       partialize: (state) => {
-        // Only persist GameState properties, not actions
+        // Only persist GameState properties, not actions or ephemeral AI state
         const {
           gameId,
           status,

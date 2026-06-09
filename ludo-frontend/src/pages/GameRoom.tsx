@@ -3,16 +3,17 @@ import { Link } from 'react-router-dom';
 import { useGameStore } from '../store/useGameStore';
 import { Board } from '../components/game/Board';
 import { Dice } from '../components/game/Dice';
+import { TimerProgressBar } from '../components/game/TimerProgressBar';
 import type { PlayerColor } from '../engine/types';
 
 /* ─── Color config per player ─── */
 const CC: Record<PlayerColor, {
   dot: string; bg: string; text: string; border: string; glow: string; dark: string;
 }> = {
-  RED:    { dot: '#e53e3e', bg: 'rgba(229,62,62,0.1)',   text: '#fc8181', border: 'rgba(229,62,62,0.3)',   glow: 'rgba(229,62,62,0.22)',  dark: '#9b2c2c' },
-  GREEN:  { dot: '#38a169', bg: 'rgba(56,161,105,0.1)',  text: '#68d391', border: 'rgba(56,161,105,0.3)',  glow: 'rgba(56,161,105,0.22)', dark: '#276749' },
-  YELLOW: { dot: '#d69e2e', bg: 'rgba(214,158,46,0.1)',  text: '#f6e05e', border: 'rgba(214,158,46,0.3)',  glow: 'rgba(214,158,46,0.22)', dark: '#975a16' },
-  BLUE:   { dot: '#3182ce', bg: 'rgba(49,130,206,0.1)',  text: '#63b3ed', border: 'rgba(49,130,206,0.3)',  glow: 'rgba(49,130,206,0.22)', dark: '#2c5282' },
+  RED: { dot: '#e53e3e', bg: 'rgba(229,62,62,0.1)', text: '#fc8181', border: 'rgba(229,62,62,0.3)', glow: 'rgba(229,62,62,0.22)', dark: '#9b2c2c' },
+  GREEN: { dot: '#38a169', bg: 'rgba(56,161,105,0.1)', text: '#68d391', border: 'rgba(56,161,105,0.3)', glow: 'rgba(56,161,105,0.22)', dark: '#276749' },
+  YELLOW: { dot: '#d69e2e', bg: 'rgba(214,158,46,0.1)', text: '#f6e05e', border: 'rgba(214,158,46,0.3)', glow: 'rgba(214,158,46,0.22)', dark: '#975a16' },
+  BLUE: { dot: '#3182ce', bg: 'rgba(49,130,206,0.1)', text: '#63b3ed', border: 'rgba(49,130,206,0.3)', glow: 'rgba(49,130,206,0.22)', dark: '#2c5282' },
 };
 
 /* ─── Player card in HUD ─── */
@@ -71,7 +72,7 @@ const PlayerCard: React.FC<{
 
       {/* Token pips */}
       <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
-        {[0,1,2,3].map(i => (
+        {[0, 1, 2, 3].map(i => (
           <span key={i} style={{
             width: 7, height: 7, borderRadius: '50%',
             background: i < tokensHome ? c.dot : 'rgba(255,255,255,0.08)',
@@ -87,23 +88,23 @@ const PlayerCard: React.FC<{
 
 /* ─── Log entry ─── */
 const LogEntry: React.FC<{ text: string; index: number }> = ({ text, index }) => {
-  const isWin     = text.startsWith('🏆');
-  const isRoll    = text.startsWith('🎲');
-  const isMove    = text.startsWith('♟');
+  const isWin = text.startsWith('🏆');
+  const isRoll = text.startsWith('🎲');
+  const isMove = text.startsWith('♟');
   const isCapture = text.includes('captures') || text.includes('Capture');
-  const isStart   = text.startsWith('🎮') || text.startsWith('Turn');
+  const isStart = text.startsWith('🎮') || text.startsWith('Turn');
 
   const color = isWin
     ? '#facc15'
     : isCapture
-    ? '#f87171'
-    : isRoll
-    ? '#a78bfa'
-    : isStart
-    ? '#60a5fa'
-    : isMove
-    ? '#4ade80'
-    : 'var(--text-muted)';
+      ? '#f87171'
+      : isRoll
+        ? '#a78bfa'
+        : isStart
+          ? '#60a5fa'
+          : isMove
+            ? '#4ade80'
+            : 'var(--text-muted)';
 
   return (
     <div className="log-entry" style={{
@@ -120,21 +121,21 @@ const LogEntry: React.FC<{ text: string; index: number }> = ({ text, index }) =>
 
 /* ─── Confetti burst ─── */
 function spawnConfetti() {
-  const colors = ['#f5c842','#8b5cf6','#ef4444','#22c55e','#3b82f6','#f97316','#ec4899'];
+  const colors = ['#f5c842', '#8b5cf6', '#ef4444', '#22c55e', '#3b82f6', '#f97316', '#ec4899'];
   const container = document.body;
   for (let i = 0; i < 80; i++) {
     const el = document.createElement('div');
     el.className = 'confetti-particle';
     const size = 6 + Math.random() * 8;
     Object.assign(el.style, {
-      left:    `${Math.random() * 100}vw`,
-      top:     '-20px',
-      width:   `${size}px`,
-      height:  `${size}px`,
+      left: `${Math.random() * 100}vw`,
+      top: '-20px',
+      width: `${size}px`,
+      height: `${size}px`,
       background: colors[Math.floor(Math.random() * colors.length)],
       borderRadius: Math.random() > 0.5 ? '50%' : '2px',
       animationDuration: `${1.8 + Math.random() * 2.4}s`,
-      animationDelay:    `${Math.random() * 0.8}s`,
+      animationDelay: `${Math.random() * 0.8}s`,
     });
     container.appendChild(el);
     setTimeout(() => el.remove(), 4500);
@@ -156,18 +157,21 @@ export const GameRoom: React.FC = () => {
   });
 
   /* Game state */
-  const [logs, setLogs]               = useState<string[]>(['Select players and launch the match!']);
-  /**
-   * rollId — increments each time a new dice roll is triggered.
-   * Passed to the Dice component so it knows exactly when to start a new
-   * animation, regardless of the face value (fixes same-value-twice bug).
-   */
-  const [rollId, setRollId]           = useState(0);
+  const [logs, setLogs] = useState<string[]>(['Select players and launch the match!']);
+
+  /* Dice states mapped to individual players */
+  const [lastRolls, setLastRolls] = useState<Record<PlayerColor, number | null>>({
+    RED: null, GREEN: null, YELLOW: null, BLUE: null
+  });
+  const [diceRollIds, setDiceRollIds] = useState<Record<PlayerColor, number>>({
+    RED: 0, GREEN: 0, YELLOW: 0, BLUE: 0
+  });
+
   const lastSeq = useRef(-1);
-  /* Ref to the log list container element for scoped scrolling (not page scroll) */
+  const lastProcessedSequenceRef = useRef(-1);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  /* Scroll log container — scoped to the inner div, never touches window */
+  /* Scroll log container — scoped to the inner div */
   useEffect(() => {
     if (logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
@@ -180,7 +184,7 @@ export const GameRoom: React.FC = () => {
     if (store.sequenceNumber === lastSeq.current) return;
     lastSeq.current = store.sequenceNumber;
 
-    const name    = store.activeColor ? store.players[store.activeColor]?.displayName : '';
+    const name = store.activeColor ? store.players[store.activeColor]?.displayName : '';
     const entries: string[] = [];
 
     if (store.turnPhase === 'WAITING_FOR_MOVE' && store.lastRoll !== null) {
@@ -192,7 +196,27 @@ export const GameRoom: React.FC = () => {
       entries.push(`🏆 ${store.players[store.winnerColor]?.displayName} wins the match!`);
     }
     if (entries.length > 0) setLogs(prev => [...prev, ...entries]);
-  }, [store.sequenceNumber, store.turnPhase, store.status]);
+  }, [store.sequenceNumber, store.turnPhase, store.status, store.players, store.activeColor, store.winnerColor, store.lastRoll]);
+
+  /* Track individual dice roll signals from the store */
+  useEffect(() => {
+    if (store.status !== 'ACTIVE') return;
+    if (store.sequenceNumber === lastProcessedSequenceRef.current) return;
+    lastProcessedSequenceRef.current = store.sequenceNumber;
+
+    if (store.lastRoll !== null && store.activeColor) {
+      setLastRolls(prev => ({
+        ...prev,
+        [store.activeColor!]: store.lastRoll
+      }));
+      if (store.turnPhase === 'WAITING_FOR_MOVE') {
+        setDiceRollIds(prev => ({
+          ...prev,
+          [store.activeColor!]: prev[store.activeColor!] + 1
+        }));
+      }
+    }
+  }, [store.sequenceNumber, store.status, store.lastRoll, store.activeColor, store.turnPhase]);
 
   /* Confetti on win */
   useEffect(() => {
@@ -203,38 +227,11 @@ export const GameRoom: React.FC = () => {
     if (store.status !== 'COMPLETED') hasSpawnedConfetti.current = false;
   }, [store.status]);
 
-  /* Turn timer
-   * FIX: One single interval at a time. We clear the previous one at the TOP
-   * of the effect (before creating a new one) so rapid sequenceNumber changes
-   * from AI turns never stack up multiple simultaneous intervals.             */
-  const [turnTimer, setTurnTimer] = useState(15);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    // Always clear any previously running interval first
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (store.status !== 'ACTIVE') return;
-
-    setTurnTimer(15);
-    timerRef.current = setInterval(() => {
-      setTurnTimer(p => (p <= 1 ? 0 : p - 1));
-    }, 1000);
-    // Cleanup when the effect re-fires or the component unmounts
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [store.sequenceNumber, store.status]);
-
   /* Active colors for selected player count */
   const activeColors: PlayerColor[] =
     playerCount === 2 ? ['RED', 'YELLOW'] :
-    playerCount === 3 ? ['RED', 'GREEN', 'YELLOW'] :
-    ['RED', 'GREEN', 'YELLOW', 'BLUE'];
+      playerCount === 3 ? ['RED', 'GREEN', 'YELLOW'] :
+        ['RED', 'GREEN', 'YELLOW', 'BLUE'];
 
   /* Handlers */
   const handleStartGame = () => {
@@ -250,11 +247,6 @@ export const GameRoom: React.FC = () => {
 
   const handleDiceRoll = useCallback(() => {
     if (store.turnPhase !== 'WAITING_FOR_ROLL') return;
-    /* Increment rollId — the Dice component's useEffect on rollId will start
-       the animation. Doing this BEFORE store.rollDiceAction() guarantees the
-       animation begins even if the store updates synchronously (which it does
-       in the local game engine). */
-    setRollId(id => id + 1);
     store.rollDiceAction();
   }, [store]);
 
@@ -275,7 +267,8 @@ export const GameRoom: React.FC = () => {
 
   const handleReset = () => {
     store.resetGameAction();
-    setRollId(0);
+    setLastRolls({ RED: null, GREEN: null, YELLOW: null, BLUE: null });
+    setDiceRollIds({ RED: 0, GREEN: 0, YELLOW: 0, BLUE: 0 });
     setLogs(['Select players and launch the match!']);
   };
 
@@ -289,7 +282,7 @@ export const GameRoom: React.FC = () => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleDiceRoll]);
+  }, [handleDiceRoll, store.status, store.activeColor, store.turnPhase, store.players]);
 
   const tokensAtHome = (color: PlayerColor) =>
     store.players[color]?.tokens?.filter(t => t.position === 57).length ?? 0;
@@ -512,7 +505,7 @@ export const GameRoom: React.FC = () => {
               {/* ── Active Turn Card ── */}
               {store.activeColor && (() => {
                 const ac = store.activeColor;
-                const c  = CC[ac];
+                const c = CC[ac];
                 const ap = store.players[ac];
                 const isAi = !!ap?.isAi;
                 const isWaitingForMove = store.turnPhase === 'WAITING_FOR_MOVE';
@@ -550,8 +543,8 @@ export const GameRoom: React.FC = () => {
                           {isAi
                             ? <><span style={{ animation: 'pulseDot 1s infinite', display: 'inline-block' }}>⚙️</span> Bot is thinking...</>
                             : isWaitingForMove
-                            ? '👆 Tap a highlighted token to move!'
-                            : '🎲 Roll the dice to play!'}
+                              ? '👆 Tap a highlighted token to move!'
+                              : '🎲 Roll the dice to play!'}
                         </div>
                       </div>
                       {/* Phase badge */}
@@ -566,89 +559,59 @@ export const GameRoom: React.FC = () => {
                       </span>
                     </div>
 
-                    {/* Timer bar */}
-                    <div style={{ marginTop: 4 }}>
-                      <div style={{
-                        height: 5, borderRadius: 3,
-                        background: 'rgba(255,255,255,0.07)',
-                        overflow: 'hidden',
-                      }}>
-                        <div style={{
-                          height: '100%', borderRadius: 3,
-                          width: `${(turnTimer / 15) * 100}%`,
-                          background: turnTimer <= 4
-                            ? 'linear-gradient(90deg,#ef4444,#f97316)'
-                            : `linear-gradient(90deg,${c.dot},${c.text})`,
-                          transition: 'width 1s linear, background 0.5s ease',
-                        }} />
-                      </div>
-                      <div style={{
-                        display: 'flex', justifyContent: 'flex-end', marginTop: 4,
-                        fontSize: 10, fontWeight: 700,
-                        color: turnTimer <= 4 ? '#f87171' : 'var(--text-muted)',
-                      }}>
-                        {turnTimer}s remaining
-                      </div>
-                    </div>
+                    {/* Decoupled Countdown Progress Bar */}
+                    <TimerProgressBar
+                      status={store.status}
+                      sequenceNumber={store.sequenceNumber}
+                      turnTimerSeconds={15}
+                      playerColorTheme={c}
+                    />
                   </div>
                 );
               })()}
 
-              {/* ── Dice Panel ── */}
-              <div style={{
-                background: 'rgba(255,255,255,0.02)',
-                border: '1px solid rgba(255,255,255,0.07)',
-                borderRadius: 18,
-                padding: '18px 20px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                gap: 24, flexWrap: 'wrap',
-              }}>
-                <Dice
-                  value={store.lastRoll}
-                  activeColor={store.activeColor}
-                  isRollable={isHumanTurn}
-                  rollId={rollId}
-                  onRoll={handleDiceRoll}
-                />
-
-                {store.lastRoll !== null && (
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
-                      Rolled
-                    </div>
-                    <div style={{
-                      fontSize: 52, fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1,
-                      textShadow: store.lastRoll === 6 ? '0 0 20px rgba(250,204,21,0.6)' : 'none',
-                    }}>
-                      {store.lastRoll}
-                    </div>
-                    {store.lastRoll === 6 && (
-                      <div style={{ fontSize: 11, color: '#facc15', fontWeight: 800, marginTop: 4, letterSpacing: 0.3 }}>
-                        🎉 Bonus Roll!
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* ── Players Scoreboard ── */}
+              {/* ── Players Scoreboard with 4 independent dice slots ── */}
               <div style={{
                 background: 'rgba(255,255,255,0.02)',
                 border: '1px solid rgba(255,255,255,0.07)',
                 borderRadius: 18, padding: '14px 16px',
               }}>
-                <div className="section-label">Players</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {activePlayers.map(p => p && (
-                    <PlayerCard
-                      key={p.color}
-                      color={p.color}
-                      name={p.displayName}
-                      isAi={!!p.isAi}
-                      isActive={store.activeColor === p.color}
-                      tokensHome={tokensAtHome(p.color)}
-                    />
-                  ))}
+                <div className="section-label">Players & Dice</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {activePlayers.map(p => {
+                    if (!p) return null;
+                    const isCurrentActive = store.activeColor === p.color;
+                    const isDiceRollable = isCurrentActive && store.turnPhase === 'WAITING_FOR_ROLL' && !p.isAi;
+
+                    const diceVal = isCurrentActive ? store.lastRoll : lastRolls[p.color];
+
+                    return (
+                      <div key={p.color} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <PlayerCard
+                            color={p.color}
+                            name={p.displayName}
+                            isAi={p.isAi}
+                            isActive={isCurrentActive}
+                            tokensHome={tokensAtHome(p.color)}
+                          />
+                        </div>
+                        <div style={{
+                          flexShrink: 0,
+                          opacity: isCurrentActive || isDiceRollable ? 1 : 0.45,
+                          transition: 'opacity 0.3s ease'
+                        }}>
+                          <Dice
+                            value={diceVal}
+                            activeColor={p.color}
+                            isRollable={isDiceRollable}
+                            rollId={diceRollIds[p.color]}
+                            onRoll={handleDiceRoll}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -687,7 +650,7 @@ export const GameRoom: React.FC = () => {
 
       {/* ══ VICTORY OVERLAY ══ */}
       {store.status === 'COMPLETED' && store.winnerColor && (() => {
-        const c          = CC[store.winnerColor];
+        const c = CC[store.winnerColor];
         const winnerName = store.players[store.winnerColor]?.displayName;
 
         return (

@@ -16,14 +16,14 @@ interface BoardProps {
 const CELL  = 40;
 const BOARD = 600;
 
-/* ─── Color palette ─── */
+/* ─── Color palette (Ludo King Theme) ─── */
 const C: Record<PlayerColor, {
   main: string; light: string; border: string; dark: string; glow: string;
 }> = {
-  RED:    { main: '#e53e3e', light: '#fff0f0', border: '#fc8181', dark: '#9b2c2c', glow: 'rgba(229,62,62,0.3)' },
-  GREEN:  { main: '#38a169', light: '#f0fff4', border: '#68d391', dark: '#276749', glow: 'rgba(56,161,105,0.3)' },
-  YELLOW: { main: '#d69e2e', light: '#fffff0', border: '#f6e05e', dark: '#975a16', glow: 'rgba(214,158,46,0.3)' },
-  BLUE:   { main: '#3182ce', light: '#ebf8ff', border: '#63b3ed', dark: '#2c5282', glow: 'rgba(49,130,206,0.3)' },
+  RED:    { main: '#d32f2f', light: '#ffebee', border: '#ff8a80', dark: '#b71c1c', glow: 'rgba(211, 47, 47, 0.4)' },
+  GREEN:  { main: '#2e7d32', light: '#e8f5e9', border: '#a5d6a7', dark: '#1b5e20', glow: 'rgba(46, 125, 50, 0.4)' },
+  YELLOW: { main: '#f57f17', light: '#fffde7', border: '#fff59d', dark: '#e65100', glow: 'rgba(245, 127, 23, 0.4)' },
+  BLUE:   { main: '#1565c0', light: '#e3f2fd', border: '#90caf9', dark: '#0d47a1', glow: 'rgba(21, 101, 192, 0.4)' },
 };
 
 /* Safe-cell global track indices */
@@ -101,8 +101,8 @@ const YardLabel: React.FC<{
   );
 };
 
-/* ─── Main Board ─── */
-export const Board: React.FC<BoardProps> = ({
+/* ─── Board Base Component ─── */
+const BoardComponent: React.FC<BoardProps> = ({
   players, activeColor, availableMoves, turnPhase, onTokenClick,
 }) => {
   /* Home yard definitions */
@@ -288,6 +288,11 @@ export const Board: React.FC<BoardProps> = ({
         <polygon points="360,240 360,360 300,300" fill={C.YELLOW.main} />
         <polygon points="360,360 240,360 300,300" fill={C.BLUE.main}   />
         <polygon points="240,360 240,240 300,300" fill={C.RED.main}    />
+
+        {/* Crossroads dividers (Gold metallic lines) */}
+        <line x1={240} y1={240} x2={360} y2={360} stroke="#fbc02d" strokeWidth={3.5} />
+        <line x1={360} y1={240} x2={240} y2={360} stroke="#fbc02d" strokeWidth={3.5} />
+
         {/* Center glow overlay */}
         <rect x={240} y={240} width={120} height={120} fill="url(#center-glow)" />
         {/* Big center star */}
@@ -295,8 +300,8 @@ export const Board: React.FC<BoardProps> = ({
         {/* Border ring */}
         <rect x={240} y={240} width={120} height={120}
           fill="none"
-          stroke="rgba(255,255,255,0.45)"
-          strokeWidth={1.5}
+          stroke="#fbc02d"
+          strokeWidth={2}
         />
 
         {/* ══ TRACK ARM GRID LINES (visual guide) ══ */}
@@ -313,13 +318,22 @@ export const Board: React.FC<BoardProps> = ({
           />
         ))}
 
-        {/* ══ BOARD OUTER BORDER ══ */}
+        {/* ══ BOARD OUTER BORDER (Ludo King style gold frame) ══ */}
         <rect
-          x={1} y={1}
-          width={BOARD - 2} height={BOARD - 2}
+          x={3} y={3}
+          width={BOARD - 6} height={BOARD - 6}
           fill="none"
-          stroke="rgba(0,0,0,0.07)"
-          strokeWidth={2}
+          stroke="#fbc02d"
+          strokeWidth={6}
+          rx={10}
+        />
+        <rect
+          x={8} y={8}
+          width={BOARD - 16} height={BOARD - 16}
+          fill="none"
+          stroke="#07080d"
+          strokeWidth={1.5}
+          rx={6}
         />
 
         {/* ══ TOKENS ══ */}
@@ -345,3 +359,61 @@ export const Board: React.FC<BoardProps> = ({
     </div>
   );
 };
+
+// Strict props-comparison for optimized rendering
+const arePropsEqual = (prevProps: BoardProps, nextProps: BoardProps) => {
+  if (prevProps.activeColor !== nextProps.activeColor) return false;
+  if (prevProps.turnPhase !== nextProps.turnPhase) return false;
+
+  // Compare availableMoves length and item values
+  if (prevProps.availableMoves.length !== nextProps.availableMoves.length) return false;
+  for (let i = 0; i < prevProps.availableMoves.length; i++) {
+    const pm = prevProps.availableMoves[i];
+    const nm = nextProps.availableMoves[i];
+    if (
+      pm.tokenIndex !== nm.tokenIndex ||
+      pm.fromPosition !== nm.fromPosition ||
+      pm.toPosition !== nm.toPosition ||
+      pm.isCapture !== nm.isCapture ||
+      pm.isGoalEntry !== nm.isGoalEntry
+    ) {
+      return false;
+    }
+  }
+
+  // Compare players structure
+  const colors: PlayerColor[] = ['RED', 'GREEN', 'YELLOW', 'BLUE'];
+  for (const color of colors) {
+    const p = prevProps.players[color];
+    const n = nextProps.players[color];
+    if (!p && !n) continue;
+    if (!p || !n) return false;
+
+    if (
+      p.displayName !== n.displayName ||
+      p.isOnline !== n.isOnline ||
+      p.isAi !== n.isAi ||
+      p.finishOrder !== n.finishOrder
+    ) {
+      return false;
+    }
+
+    // Compare nested tokens
+    for (let i = 0; i < 4; i++) {
+      const pt = p.tokens[i];
+      const nt = n.tokens[i];
+      if (
+        pt.index !== nt.index ||
+        pt.position !== nt.position ||
+        pt.status !== nt.status ||
+        pt.isSafe !== nt.isSafe
+      ) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
+
+export const Board = React.memo(BoardComponent, arePropsEqual);

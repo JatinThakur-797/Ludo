@@ -5,6 +5,8 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { api } from '../services/api';
 import { Board } from '../components/game/Board';
 import { Dice } from '../components/game/Dice';
+import { TimerProgressBar } from '../components/game/TimerProgressBar';
+import { ChatPanel } from '../components/game/ChatPanel';
 import { gameAudio } from '../utils/audio';
 import type { PlayerColor, GameStatus, GameState, PlayerState } from '../engine/types';
 
@@ -115,41 +117,32 @@ export const OnlineGameRoom: React.FC = () => {
   const { isConnected, connect, subscribe, sendMessage } = useWebSocket();
 
   const [room, setRoom]             = useState<LudoRoom | null>(null);
-  const [chatMessages, setChatMessages] = useState<Array<{ sender: string; content: string }>>([]);
-  const [chatInput, setChatInput]   = useState('');
   const [logs, setLogs]             = useState<string[]>(['Connecting to room...']);
-  const [turnTime, setTurnTime]     = useState(15);
-  /**
-   * rollId — incremented each time the server signals a dice roll via the
-   * PLAY_SOUND_ROLL effect. Using a counter (not a boolean) ensures:
-   *  - Animations start for every distinct roll event, even same-face repeats.
-   *  - No 600ms setTimeout race: the Dice component itself enforces MIN duration.
-   *  - No stale closure issues: only the increment matters, not the value.
-   */
-  const [rollId, setRollId]         = useState(0);
+  
+  /* Dice states mapped to individual players */
+  const [lastRolls, setLastRolls]   = useState<Record<PlayerColor, number | null>>({
+    RED: null, GREEN: null, YELLOW: null, BLUE: null
+  });
+  const [diceRollIds, setDiceRollIds] = useState<Record<PlayerColor, number>>({
+    RED: 0, GREEN: 0, YELLOW: 0, BLUE: 0
+  });
+
   const [copied, setCopied]         = useState(false);
   const [activePanel, setActivePanel] = useState<'log' | 'chat'>('log');
   const hasConfetti                 = useRef(false);
 
-  /* Scoped scroll refs — these point to the CONTAINER divs, not sentinel
-     elements. We scroll via scrollTop to avoid scrollIntoView climbing the
-     DOM and jumping the page viewport on mobile. */
+  /* Scoped scroll refs — these point to the CONTAINER divs. Scroll via
+     scrollTop to avoid viewport jumps. */
   const logContainerRef  = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-  const lastSeqRef = useRef<number>(-1);
+  const lastProcessedSeqRef = useRef<number>(-1);
 
-  /* Scroll log/chat containers — scoped to their inner div, never touches
-     the page window. This eliminates the #1 cause of mobile viewport jumps. */
+  /* Scroll log container — scoped to its inner div */
   useEffect(() => {
     if (logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
   }, [logs]);
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [chatMessages]);
+
   useEffect(() => { connect(); }, [connect]);
 
   useEffect(() => {
@@ -169,6 +162,27 @@ export const OnlineGameRoom: React.FC = () => {
     };
     if (code) fetchRoom();
   }, [code, navigate]);
+
+  /* Track dice roll state maps based on server game state changes */
+  useEffect(() => {
+    if (room?.status !== 'ACTIVE' || !room?.gameState) return;
+    const gs = room.gameState;
+    if (gs.sequenceNumber === lastProcessedSeqRef.current) return;
+    lastProcessedSeqRef.current = gs.sequenceNumber;
+
+    if (gs.lastRoll !== null && gs.activeColor) {
+      setLastRolls(prev => ({
+        ...prev,
+        [gs.activeColor!]: gs.lastRoll
+      }));
+      if (gs.turnPhase === 'WAITING_FOR_MOVE') {
+        setDiceRollIds(prev => ({
+          ...prev,
+          [gs.activeColor!]: prev[gs.activeColor!] + 1
+        }));
+      }
+    }
+  }, [room?.gameState?.sequenceNumber, room?.status, room?.gameState]);
 
   /* WebSocket */
   useEffect(() => {
@@ -192,13 +206,7 @@ export const OnlineGameRoom: React.FC = () => {
         setRoom(prev => prev ? { ...prev, status: gs.status, gameState: gs } : prev);
 
         (su.effects || []).forEach(eff => {
-          if (eff.type === 'PLAY_SOUND_ROLL') {
-            /* Increment rollId to start a new dice animation.
-               The Dice component enforces the minimum 1500ms duration
-               internally, so we no longer need the 600ms setTimeout hack. */
-            setRollId(id => id + 1);
-            gameAudio.playRoll();
-          }
+          if (eff.type === 'PLAY_SOUND_ROLL')       gameAudio.playRoll();
           else if (eff.type === 'PLAY_SOUND_MOVE')    gameAudio.playMove();
           else if (eff.type === 'PLAY_SOUND_CAPTURE') gameAudio.playCapture();
           else if (eff.type === 'PLAY_SOUND_GOAL')    gameAudio.playGoal();
@@ -214,10 +222,6 @@ export const OnlineGameRoom: React.FC = () => {
           const winnerName = gs.players[gs.winnerColor]?.displayName || '';
           setLogs(p => [...p, `🏆 ${winnerName} wins!`]);
         }
-      } else if (eventType === 'CHAT_MESSAGE') {
-        const cd = data as { sender?: string; content?: string };
-        setChatMessages(p => [...p, { sender: cd.sender || 'Anonymous', content: cd.content || '' }]);
-        setActivePanel('chat');
       }
     });
 
@@ -228,38 +232,6 @@ export const OnlineGameRoom: React.FC = () => {
 
     return () => { roomSub?.unsubscribe(); errSub?.unsubscribe(); };
   }, [isConnected, code, subscribe, sendMessage]);
-
-  /* Timer
-   * FIX: Two-effect pattern replaced with one combined effect.
-   * Sequence reset + interval creation happen together so there is exactly
-   * one interval running at any point in time.                              */
-  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    // Always clear the previous interval first (prevents stacking)
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-    if (room?.status !== 'ACTIVE' || !room?.gameState) return;
-
-    const seq = room.gameState.sequenceNumber;
-    // Reset timer display when sequence changes
-    if (seq !== lastSeqRef.current) {
-      lastSeqRef.current = seq;
-      setTurnTime(room.settings?.turnTimerSeconds ?? 15);
-    }
-
-    timerIntervalRef.current = setInterval(
-      () => setTurnTime(p => (p <= 1 ? 0 : p - 1)),
-      1000
-    );
-    return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
-      }
-    };
-  }, [room?.status, room?.gameState?.sequenceNumber]);
 
   /* Confetti on win */
   useEffect(() => {
@@ -287,11 +259,6 @@ export const OnlineGameRoom: React.FC = () => {
   const handleTokenClick = (idx: number) => {
     if (isMyTurn && room?.gameState?.turnPhase === 'WAITING_FOR_MOVE')
       sendMessage(`/app/game/${code}/move`, { tokenIndex: idx });
-  };
-  const handleSendChat = () => {
-    if (!chatInput.trim() || !code) return;
-    sendMessage(`/app/room/${code}/chat`, { content: chatInput });
-    setChatInput('');
   };
   const handleCopyCode = () => {
     if (!code) return;
@@ -493,43 +460,14 @@ export const OnlineGameRoom: React.FC = () => {
               </div>
             </div>
 
-            {/* Lobby Chat */}
-            <div className="glass-card" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', height: 500 }}>
-              <div className="section-label">Lobby Chat</div>
-              <div ref={chatContainerRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
-                {chatMessages.length === 0 && (
-                  <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, marginTop: 50, fontStyle: 'italic' }}>
-                    Say hello to your opponents! 👋
-                  </p>
-                )}
-                {chatMessages.map((msg, i) => {
-                  const isMe = msg.sender === user?.displayName;
-                  return (
-                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', animation: 'slideInUp 0.2s ease-out' }}>
-                      <span style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3, fontWeight: 600 }}>
-                        {isMe ? 'You' : msg.sender}
-                      </span>
-                      <div className={isMe ? 'chat-bubble-mine' : 'chat-bubble-other'}>
-                        {msg.content}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="text" value={chatInput}
-                  onChange={e => setChatInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSendChat()}
-                  placeholder="Type a message..."
-                  className="input-field"
-                  style={{ fontSize: 13 }}
-                />
-                <button onClick={handleSendChat} className="btn-primary" style={{ padding: '10px 16px', fontSize: 13, borderRadius: 12 }}>
-                  Send
-                </button>
-              </div>
-            </div>
+            {/* Decoupled Lobby Chat Panel */}
+            <ChatPanel
+              code={code!}
+              user={user}
+              activePanel={activePanel}
+              setActivePanel={setActivePanel}
+              variant="lobby"
+            />
           </div>
         )}
 
@@ -599,70 +537,60 @@ export const OnlineGameRoom: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <div>
-                      <div style={{ height: 5, background: 'rgba(255,255,255,0.07)', borderRadius: 3, overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%', borderRadius: 3,
-                          width: `${(turnTime / (room.settings.turnTimerSeconds ?? 15)) * 100}%`,
-                          background: turnTime <= 4 ? 'linear-gradient(90deg,#ef4444,#f97316)' : `linear-gradient(90deg,${cfg.dot},${cfg.text})`,
-                          transition: 'width 1s linear',
-                        }} />
-                      </div>
-                      <div style={{ textAlign: 'right', fontSize: 10, color: turnTime <= 4 ? '#f87171' : 'var(--text-muted)', marginTop: 4, fontWeight: 700 }}>
-                        {turnTime}s remaining
-                      </div>
-                    </div>
+                    {/* Decoupled Progress Bar */}
+                    <TimerProgressBar
+                      status={room.status}
+                      sequenceNumber={room.gameState.sequenceNumber}
+                      turnTimerSeconds={room.settings.turnTimerSeconds ?? 15}
+                      playerColorTheme={cfg}
+                    />
                   </div>
                 );
               })()}
 
-              {/* Dice */}
-              <div style={{
-                background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
-                borderRadius: 18, padding: '18px 20px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, flexWrap: 'wrap',
-              }}>
-                <Dice
-                  value={room.gameState.lastRoll}
-                  activeColor={room.gameState.activeColor}
-                  isRollable={isMyTurn && room.gameState.turnPhase === 'WAITING_FOR_ROLL'}
-                  rollId={rollId}
-                  onRoll={handleDiceRoll}
-                />
-                {room.gameState.lastRoll !== null && (
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>Rolled</div>
-                    <div style={{
-                      fontSize: 52, fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1,
-                      textShadow: room.gameState.lastRoll === 6 ? '0 0 20px rgba(250,204,21,0.6)' : 'none',
-                    }}>
-                      {room.gameState.lastRoll}
-                    </div>
-                    {room.gameState.lastRoll === 6 && (
-                      <div style={{ fontSize: 11, color: '#facc15', fontWeight: 800, marginTop: 3 }}>🎉 Bonus!</div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Players list */}
+              {/* Players list with 4 independent dice slots */}
               <div style={{
                 background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
                 borderRadius: 18, padding: '14px 16px',
               }}>
-                <div className="section-label">Players</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {(Object.values(room.gameState.players) as PlayerState[]).map(p => p && (
-                    <PlayerCard
-                      key={p.color}
-                      color={p.color}
-                      name={p.displayName}
-                      isAi={getAi(p)}
-                      isOnline={getPOnline(p)}
-                      isActive={room.gameState!.activeColor === p.color}
-                      tokensHome={tokensAtHome(p.color)}
-                    />
-                  ))}
+                <div className="section-label">Players & Dice</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {(Object.values(room.gameState.players) as PlayerState[]).map(p => {
+                    if (!p) return null;
+                    const isCurrentActive = room.gameState!.activeColor === p.color;
+                    const isDiceRollable = isMyTurn && isCurrentActive && room.gameState!.turnPhase === 'WAITING_FOR_ROLL' && p.color === myColor;
+                    
+                    // Show current roll value if they are active, otherwise show their last recorded roll
+                    const diceVal = isCurrentActive ? room.gameState!.lastRoll : lastRolls[p.color];
+                    
+                    return (
+                      <div key={p.color} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <PlayerCard
+                            color={p.color}
+                            name={p.displayName}
+                            isAi={getAi(p)}
+                            isOnline={getPOnline(p)}
+                            isActive={isCurrentActive}
+                            tokensHome={tokensAtHome(p.color)}
+                          />
+                        </div>
+                        <div style={{
+                          flexShrink: 0,
+                          opacity: isCurrentActive || isDiceRollable ? 1 : 0.45,
+                          transition: 'opacity 0.3s ease'
+                        }}>
+                          <Dice
+                            value={diceVal}
+                            activeColor={p.color}
+                            isRollable={isDiceRollable}
+                            rollId={diceRollIds[p.color]}
+                            onRoll={handleDiceRoll}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -687,14 +615,6 @@ export const OnlineGameRoom: React.FC = () => {
                       }}
                     >
                       {panel === 'log' ? '📋 Log' : '💬 Chat'}
-                      {panel === 'chat' && chatMessages.length > 0 && (
-                        <span style={{
-                          marginLeft: 5, background: 'var(--accent-violet)', color: '#fff',
-                          borderRadius: 10, padding: '1px 5px', fontSize: 9, fontWeight: 900,
-                        }}>
-                          {chatMessages.length}
-                        </span>
-                      )}
                     </button>
                   ))}
                 </div>
@@ -711,41 +631,15 @@ export const OnlineGameRoom: React.FC = () => {
                   </div>
                 )}
 
-                {/* Chat panel */}
+                {/* Decoupled Game Chat Panel */}
                 {activePanel === 'chat' && (
-                  <>
-                    <div ref={chatContainerRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
-                      {chatMessages.length === 0 && (
-                        <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 11, marginTop: 30, fontStyle: 'italic' }}>
-                          No messages yet
-                        </p>
-                      )}
-                      {chatMessages.map((msg, i) => {
-                        const isMe = msg.sender === user?.displayName;
-                        return (
-                          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
-                            <span style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 2, fontWeight: 600 }}>{isMe ? 'You' : msg.sender}</span>
-                            <div className={isMe ? 'chat-bubble-mine' : 'chat-bubble-other'} style={{ fontSize: 12, padding: '6px 12px' }}>
-                              {msg.content}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div style={{ display: 'flex', gap: 7, flexShrink: 0 }}>
-                      <input
-                        type="text" value={chatInput}
-                        onChange={e => setChatInput(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleSendChat()}
-                        placeholder="Message..."
-                        className="input-field"
-                        style={{ fontSize: 13, padding: '8px 12px' }}
-                      />
-                      <button onClick={handleSendChat} className="btn-primary" style={{ padding: '8px 14px', fontSize: 13, borderRadius: 11, flexShrink: 0 }}>
-                        →
-                      </button>
-                    </div>
-                  </>
+                  <ChatPanel
+                    code={code!}
+                    user={user}
+                    activePanel={activePanel}
+                    setActivePanel={setActivePanel}
+                    variant="game"
+                  />
                 )}
               </div>
             </div>
