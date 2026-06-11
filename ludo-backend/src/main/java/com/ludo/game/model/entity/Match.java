@@ -5,6 +5,9 @@ import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 @Entity
 @Table(name = "matches")
 public class Match {
@@ -29,7 +32,8 @@ public class Match {
     @JoinColumn(name = "winner_id")
     private User winner;
 
-    @Column(name = "game_state_snapshot", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "game_state_snapshot")
     private String gameStateSnapshot;
 
     public Match() {
