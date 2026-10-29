@@ -7,6 +7,7 @@ import { Register } from './pages/Register';
 import { GameRoom } from './pages/GameRoom';
 import { OnlineGameRoom } from './pages/OnlineGameRoom';
 import { ProtectedRoute } from './routes/ProtectedRoute';
+import { Analytics } from '@vercel/analytics/react';
 
 function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
@@ -49,6 +50,7 @@ function App() {
         {/* Catch-all redirect to Dashboard */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <Analytics />
     </BrowserRouter>
   );
 }
