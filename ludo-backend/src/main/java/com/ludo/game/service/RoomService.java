@@ -1,8 +1,35 @@
 package com.ludo.game.service;
 
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ludo.game.config.RedisConfig;
-import com.ludo.game.dto.*;
+import com.ludo.game.dto.GameEffect;
+import com.ludo.game.dto.GameState;
+import com.ludo.game.dto.LudoRoom;
+import com.ludo.game.dto.PlayerState;
+import com.ludo.game.dto.RedisPubSubMessage;
+import com.ludo.game.dto.RoomSettings;
+import com.ludo.game.dto.RoomSlot;
+import com.ludo.game.dto.ValidMove;
 import com.ludo.game.engine.LudoEngine;
 import com.ludo.game.model.entity.Match;
 import com.ludo.game.model.entity.MatchPlayer;
@@ -12,14 +39,6 @@ import com.ludo.game.model.enums.GameStatus;
 import com.ludo.game.repository.MatchPlayerRepository;
 import com.ludo.game.repository.MatchRepository;
 import com.ludo.game.repository.UserRepository;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Duration;
-import java.time.OffsetDateTime;
-import java.util.*;
-import java.util.concurrent.*;
 
 @Service
 public class RoomService {

@@ -1,18 +1,19 @@
 package com.ludo.game.controller;
 
-import com.ludo.game.dto.MatchHistoryDto;
-import com.ludo.game.dto.UserStatsDto;
-import com.ludo.game.security.UserPrincipal;
-import com.ludo.game.service.ProfileService;
+import java.security.Principal;
+import java.util.List;
+import java.util.UUID;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.security.Principal;
-import java.util.List;
-import java.util.UUID;
+import com.ludo.game.dto.MatchHistoryDto;
+import com.ludo.game.dto.UserStatsDto;
+import com.ludo.game.security.UserPrincipal;
+import com.ludo.game.service.ProfileService;
 
 @RestController
 @RequestMapping("/api/users/me")

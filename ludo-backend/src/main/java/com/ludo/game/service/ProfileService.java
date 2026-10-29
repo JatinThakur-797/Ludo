@@ -1,5 +1,15 @@
 package com.ludo.game.service;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.ludo.game.dto.MatchHistoryDto;
 import com.ludo.game.dto.MatchHistoryPlayerDto;
 import com.ludo.game.dto.UserStatsDto;
@@ -7,11 +17,6 @@ import com.ludo.game.model.entity.MatchPlayer;
 import com.ludo.game.model.entity.User;
 import com.ludo.game.repository.MatchPlayerRepository;
 import com.ludo.game.repository.UserRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class ProfileService {

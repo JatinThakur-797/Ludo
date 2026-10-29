@@ -1,8 +1,9 @@
 package com.ludo.game.dto;
 
-import com.ludo.game.model.enums.GameStatus;
 import java.util.List;
 import java.util.Map;
+
+import com.ludo.game.model.enums.GameStatus;
 
 public class LudoRoom {
     private String roomCode;
