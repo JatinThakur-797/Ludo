@@ -522,6 +522,8 @@ Go to **Settings → Secrets and variables → Actions** and add:
 |--------|----------------|
 | `KOYEB_TOKEN` | Koyeb → Account → API → Create Token |
 | `VERCEL_TOKEN` | Vercel → Account Settings → Tokens |
+| `VERCEL_ORG_ID` | Vercel → Project Settings → General, or the Team ID for team projects |
+| `VERCEL_PROJECT_ID` | Vercel → Project Settings → General |
 
 > `GITHUB_TOKEN` is auto-provided by GitHub Actions — no setup needed.
 
