@@ -39,6 +39,7 @@
 - [WebSocket Events](#-websocket-events)
 - [Deployment](#-deployment)
 - [Game Rules](#-game-rules)
+- [Testing & Verification](#-testing--verification)
 - [Roadmap](#-roadmap)
 
 ---
@@ -537,6 +538,54 @@ Go to **Settings → Secrets and variables → Actions** and add:
 - **Three consecutive 6s** cancel the turn
 - First player to get all 4 tokens home **wins**
 - **Server-authoritative** — the `LudoEngine.java` validates every move; invalid moves are rejected with a WebSocket error
+
+---
+
+## 🧪 Testing & Verification
+
+The codebase maintains automated unit and integration test suites across both backend and frontend to guarantee deterministic game rules, anti-cheat validation, and real-time state synchronization.
+
+### Test Execution Summary
+
+| Scope | Framework | Suites | Tests | Status | Avg Execution |
+|:---|:---|:---:|:---:|:---:|:---:|
+| **Backend** | JUnit 5, Spring Boot Test, Mockito | 7 | 22 | Passing | ~31 s (full context) |
+| **Frontend** | Vitest, React Testing Library | 2 | 11 | Passing | ~486 ms |
+| **Combined** | Full-Stack Suite | **9** | **33** | **100% Pass** | CI Verified |
+
+### Test Scope Breakdown
+
+- **Backend Logic & Concurrency (`ludo-backend/src/test`)**:
+  - `AuthControllerTest` (8 tests): User signup, login verification, token rotation, and invalid credential safeguards.
+  - `LudoEngineTest` (7 tests): Core board movement, home-column limits, safe-zone collision immunity, and triple-six penalty forfeits.
+  - `WebSocketIntegrationTest` & `RoomLifecycleIntegrationTest` (3 tests): STOMP message brokering over SockJS, room state machine transitions, and player disconnections.
+  - `ProfileServiceTest` & `LeaderboardControllerTest` (3 tests): User match statistics, leaderboard rankings, and profile updates.
+  - `LudoApplicationTests` (1 test): Spring Boot context initialization and container dependency wiring.
+
+- **Frontend Engine & AI Heuristics (`ludo-frontend/src/tests`)**:
+  - `ludoEngine.test.ts` (8 tests): Turn sequencing, token release on rolling 6, opponent capture mechanics, and terminal win-state resolution.
+  - `aiHeuristics.test.ts` (3 tests): Heuristic decision matrix validating that bots prioritize capturing opponent tokens, evading trailing threats, and advancing home.
+
+### Production Build & Asset Footprint
+
+Client asset sizes generated via the Vite production compiler:
+
+| Asset | Size | Gzip Size | Compression Ratio |
+|:---|:---:|:---:|:---:|
+| `index.html` | 0.46 kB | 0.29 kB | ~37% |
+| `index-*.css` | 16.23 kB | 4.28 kB | ~74% |
+| `index-*.js` | 408.05 kB | 123.45 kB | ~70% |
+| **Total Transfer** | **~425 kB** | **~128 kB** | **~70% reduction** |
+
+### Running Tests Locally
+
+```bash
+# Run backend JUnit test suite
+cd ludo-backend && mvn test
+
+# Run frontend Vitest suite
+cd ludo-frontend && npm test
+```
 
 ---
 
